@@ -1,9 +1,6 @@
 const { Sequelize } = require("sequelize");
-require("dotenv").config(); // Load environment variables from .env file
+require("dotenv").config(); 
 const pg = require("pg");
-// let sequelize;
-
-// For production deployment on Render.com or similar
 
 const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: "postgres",
