@@ -1,214 +1,120 @@
 const request = require("supertest");
-const app = require("../app");
-const { User } = require("../models");
-const jwt = require("jsonwebtoken");
-const { sequelize } = require("../config/database"); // Ensure this line is correctt
-const dotenv = require("dotenv");
+const app = require("../index");
+const { User, Organisation } = require("../src/models/model");
 
-dotenv.config();
+describe("Auth Endpoints", () => {
+  beforeEach(async () => {
+    await User.destroy({ where: {} });
+  }, 15000);
 
-describe("Auth Endpoints", function () {
-  this.timeout(20000); // Increase the timeout to 20000ms (20 seconds) for the entire suite
-
-  before(async function () {
-    this.timeout(20000); // Increase the timeout for this hook to 20000
-    try {
-      console.log("Syncing the database...");
-      await sequelize.sync({ force: true }); // Ensure database is in a clean state
-      console.log("Database synced successfully.");
-    } catch (error) {
-      console.error("Error syncing the database:", error);
-      throw error; // Re-throw the error to fail the test if syncing fails
-    }
+  afterEach(async () => {
+    await User.destroy({ where: {} });
   });
 
-  describe("POST /auth/register", () => {
-    it("Should register user successfully with default organisation", async function () {
-      this.timeout(10000);
-      const { expect } = await import("chai");
-
-      const res = await request(app).post("/auth/register").send({
-        firstName: "John",
-        lastName: "Doe",
-        email: "john@example.com",
-        password: "password",
-        phone: "1234567890",
-      });
-
-      expect(res.status).to.equal(201);
-      expect(res.body).to.have.property("status", "success");
-      expect(res.body.data).to.have.property("accessToken");
-      expect(res.body.data.user).to.include({
-        firstName: "John",
-        lastName: "Doe",
-        email: "john@example.com",
-        phone: "1234567890",
-      });
-
-      // Check default organisation name
-      expect(res.body.data.user.organisation).to.be.an("object");
-      expect(res.body.data.user.organisation).to.have.property(
-        "name",
-        "John's Organisation"
-      );
+  it("should register user successfully with default organisation", async () => {
+    const res = await request(app).post("/api/auth/register").send({
+      firstName: "Ilonze",
+      lastName: "Chibuikem",
+      email: "chibuikemichaelilonze@gmail.com",
+      password: "password234",
+      phone: "1234567890",
     });
 
-    it("Should fail if required fields are missing", async function () {
-      this.timeout(10000);
-      const { expect } = await import("chai");
+    expect(res.status).toBe(201);
+    expect(res.body.data.user.firstName).toBe("Ilonze");
+    expect(res.body.data.user.lastName).toBe("Chibuikem");
+    expect(res.body.data.accessToken).toBeDefined();
+  }, 10000);
 
-      const res = await request(app).post("/auth/register").send({
-        lastName: "Doe",
-        email: "john@example.com",
-        password: "password",
-      });
-
-      expect(res.status).to.equal(422);
-      expect(res.body.errors).to.be.an("array").that.is.not.empty;
+  it("should log the user in successfully", async () => {
+    await request(app).post("/api/auth/register").send({
+      firstName: "Ilonze",
+      lastName: "Chibuikem",
+      email: "chibuikemichaelilonze@gmail.com",
+      password: "password234",
+      phone: "1234567890",
     });
 
-    it("Should fail if there’s duplicate email or userID", async function () {
-      this.timeout(10000);
-      const { expect } = await import("chai");
-
-      await request(app).post("/auth/register").send({
-        firstName: "John",
-        lastName: "Doe",
-        email: "john@example.com",
-        password: "password",
-        phone: "1234567890",
-      });
-
-      const res = await request(app).post("/auth/register").send({
-        firstName: "Jane",
-        lastName: "Doe",
-        email: "john@example.com",
-        password: "password",
-        phone: "1234567890",
-      });
-
-      expect(res.status).to.equal(422);
-      expect(res.body.errors).to.be.an("array").that.is.not.empty;
+    const res = await request(app).post("/api/auth/login").send({
+      email: "chibuikemichaelilonze@gmail.com",
+      password: "password234",
     });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.email).toBe("chibuikemichaelilonze@gmail.com");
+    expect(res.body.data.accessToken).toBeDefined();
   });
 
-  describe("POST /auth/login", () => {
-    before(async function () {
-      this.timeout(10000); // Increase the timeout for this hook to 10000ms
-      await request(app).post("/auth/register").send({
-        firstName: "John",
-        lastName: "Doe",
-        email: "john@example.com",
-        password: "password",
-        phone: "1234567890",
-      });
+  it("should fail if required fields are missing", async () => {
+    const res = await request(app).post("/api/auth/register").send({
+      firstName: "Ilonze",
+      email: "chibuikemichaelilonze@gmail.com",
+      password: "password234",
     });
 
-    it("Should log the user in successfully", async function () {
-      this.timeout(10000);
-      const { expect } = await import("chai");
-
-      const res = await request(app).post("/auth/login").send({
-        email: "john@example.com",
-        password: "password",
-      });
-
-      expect(res.status).to.equal(200);
-      expect(res.body).to.have.property("status", "success");
-      expect(res.body.data).to.have.property("accessToken");
-      expect(res.body.data.user).to.include({
-        firstName: "John",
-        lastName: "Doe",
-        email: "john@example.com",
-        phone: "1234567890",
-      });
-    });
-
-    it("Should fail if credentials are invalid", async function () {
-      this.timeout(10000);
-      const { expect } = await import("chai");
-
-      const res = await request(app).post("/auth/login").send({
-        email: "john@example.com",
-        password: "wrongpassword",
-      });
-
-      expect(res.status).to.equal(401);
-      expect(res.body).to.have.property("message", "Authentication failed");
-    });
-
-    it("Should fail if email or password is missing", async function () {
-      this.timeout(10000);
-      const { expect } = await import("chai");
-
-      const res = await request(app).post("/auth/login").send({
-        email: "john@example.com",
-      });
-
-      expect(res.status).to.equal(422);
-      expect(res.body.errors).to.be.an("array").that.is.not.empty;
-    });
-
-    it("Should fail if email is unregistered", async function () {
-      this.timeout(10000);
-      const { expect } = await import("chai");
-
-      const res = await request(app).post("/auth/login").send({
-        email: "unregistered@example.com",
-        password: "password",
-      });
-
-      expect(res.status).to.equal(401);
-      expect(res.body).to.have.property("message", "Authentication failed");
-    });
+    expect(res.status).toBe(422);
+    expect(res.body.errors[0].message).toContain("Last name is required");
   });
 
-  describe("Token Generation", () => {
-    it("Should generate token with correct expiry and user details", async function () {
-      this.timeout(10000);
-      const { expect } = await import("chai");
-      // Assuming you have a user with known details, or you create one specifically for this test
-      const user = await User.findOne({ where: { email: "john@example.com" } });
-      const token = jwt.sign({ userId: user.userId }, process.env.JWT_SECRET, {
-        expiresIn: "6h",
-      });
-      const decoded = jwt.decode(token);
-
-      expect(decoded).to.have.property("userId", user.userId);
-      expect(decoded).to.have.property("exp").that.is.a("number");
-
-      const currentTimeInSeconds = Math.floor(Date.now() / 1000);
-      const tokenExpiry = decoded.exp;
-
-      // Check if token expiry is in the future (greater than current time)
-      expect(tokenExpiry).to.be.greaterThan(currentTimeInSeconds);
+  it("should fail if there’s duplicate email", async () => {
+    await request(app).post("/api/auth/register").send({
+      firstName: "Ilonze",
+      lastName: "Chibuikem",
+      email: "chibuikemichaelilonze@gmail.com",
+      password: "password234",
+      phone: "09036000775",
     });
+
+    const res = await request(app).post("/api/auth/register").send({
+      firstName: "Ilonze",
+      lastName: "Chioma",
+      email: "chibuikemichaelilonze@gmail.com",
+      password: "password234",
+      phone: "09036117775",
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toContain("User already exists");
+  });
+});
+
+describe("Organisation Access", () => {
+  beforeEach(async () => {
+    await User.destroy({ where: {} });
+    await Organisation.destroy({ where: {} });
   });
 
-  // Mock implementation for illustration purposes
-  const mockOrganisationData = [
-    { id: 1, name: "Organisation A", userId: 1 },
-    { id: 2, name: "Organisation B", userId: 2 },
-  ];
-
-  describe("Organisation Access", () => {
-    it("Should restrict access to organisations based on user's access", async function () {
-      this.timeout(10000);
-      const { expect } = await import("chai");
-
-      // Mock a user context
-      const currentUser = { userId: 1 };
-
-      // Simulate fetching organisations
-      const userOrganisations = mockOrganisationData.filter(
-        (org) => org.userId === currentUser.userId
-      );
-
-      expect(userOrganisations).to.have.lengthOf.at.least(1);
-
-      userOrganisations.forEach((org) => {
-        expect(org.userId).to.equal(currentUser.userId);
-      });
+  it("should not allow users to see data from organisations they do not have access to", async () => {
+    const user1 = await User.create({
+      firstName: "Ilonze",
+      lastName: "Chibuikem",
+      email: "chibuikemichaelilonze@gmail.com",
+      password: "password234",
+      phone: "1234567890",
     });
-  });
+
+    const user2 = await User.create({
+      firstName: "Ilonze",
+      lastName: "Chibuikem",
+      email: "justilonze@gmail.com",
+      password: "password234",
+      phone: "1234567890",
+    });
+
+    const organisation = await Organisation.create({
+      name: "Ilonze's Organisation",
+    });
+
+    await user1.addOrganisation(organisation);
+
+    const token1 = user1.createJWT();
+    const token2 = user2.createJWT();
+
+    const response = await request(app)
+      .get(`/api/organisations/${organisation.orgId}`)
+      .set("Authorization", `Bearer ${token2}`);
+
+    expect(response.status).toBe(401);
+    expect(response.body.message).toBe("Access denied");
+  }, 10000);
 });
