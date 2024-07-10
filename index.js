@@ -17,7 +17,7 @@ readdirSync("./src/routes").map((routePath) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("Test 99, Let hope this is the last!");
+  res.send("Test 101, Let hope this is the last!");
 });
 
 app.use(errorHandlerMiddleware);
