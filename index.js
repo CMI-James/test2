@@ -11,9 +11,9 @@ app.use(express.urlencoded({ extended: false }));
 
 readdirSync("./src/routes").map((routePath) => {
   if (routePath === "auth.route.js") {
-    return app.use("/api", require(`./src/routes/${routePath}`));
+    return app.use("/", require(`./src/routes/${routePath}`));
   }
-  app.use("/api", /* authenticate */ require(`./src/routes/${routePath}`));
+  app.use("/", /* authenticate */ require(`./src/routes/${routePath}`));
 });
 
 app.get("/", (req, res) => {
